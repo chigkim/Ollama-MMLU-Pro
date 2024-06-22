@@ -6,12 +6,17 @@ from tqdm import tqdm
 from openai import OpenAI
 from datasets import load_dataset
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--url", help="base_url, default=localhost:11434/v1", default="http://localhost:11434'/v1")
+parser.add_argument("--url", help="base_url, default=localhost:11434/v1", default="http://localhost:11434/v1")
 parser.add_argument("--api", help="api key, default=api", default='api')
 parser.add_argument("--model", help="Model name, default=llama3", default="llama3")
 parser.add_argument("--category", type=str, default="all")
+parser.add_argument(
+		"--parallel", type=int, default=1, help="Number of parallel requests"
+)
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api)
 
@@ -21,19 +26,16 @@ def get_completion(prompt: str):
 		messages=[
 			{
 				"role": "system",
-				"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
+				"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`.",
 			},
-			{
-				"role": "user",
-				"content": prompt
-			}
+			{"role": "user", "content": prompt},
 		],
 		temperature=0.1,
 		max_tokens=4096,
 		top_p=1,
 		frequency_penalty=0,
 		presence_penalty=0,
-		stop=["Question:"]
+		stop=["Question:"],
 	)
 
 	return response.choices[0].message.content
@@ -87,7 +89,6 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
-		#print("extraction failed")
 		return None
 
 
@@ -95,8 +96,10 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 	exist = True
 	q_id = single_question["question_id"]
 	for each in exist_result:
-		if q_id == each["question_id"] and single_question["question"] == each["question"]:
-			#print("already exists, skip it")
+		if (
+			q_id == each["question_id"]
+			and single_question["question"] == each["question"]
+		):
 			return each["pred"], each["response"], exist
 	exist = False
 	category = single_question["category"]
@@ -117,31 +120,31 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 	return pred, response, exist
 
 
-def update_result(output_res_path):
+def update_result(output_res_path, lock):
 	category_record = {}
 	res = []
 	success = False
 	while not success:
 		try:
 			if os.path.exists(output_res_path):
-				with open(output_res_path, "r") as fi:
-					res = json.load(fi)
-					for each in res:
-						category = each["category"]
-						if category not in category_record:
-							category_record[category] = {"corr": 0.0, "wrong": 0.0}
-						if not each["pred"]:
-							random.seed(12345)
-							x = random.randint(0, len(each["options"]) - 1)
-							if x == each["answer_index"]:
+				with lock:
+					with open(output_res_path, "r") as fi:
+						res = json.load(fi)
+						for each in res:
+							category = each["category"]
+							if category not in category_record:
+								category_record[category] = {"corr": 0.0, "wrong": 0.0}
+							if not each["pred"]:
+								random.seed(12345)
+								x = random.randint(0, len(each["options"]) - 1)
+								if x == each["answer_index"]:
+									category_record[category]["corr"] += 1
+								else:
+									category_record[category]["wrong"] += 1
+							elif each["pred"] == each["answer"]:
 								category_record[category]["corr"] += 1
-								#print("random hit.")
 							else:
 								category_record[category]["wrong"] += 1
-						elif each["pred"] == each["answer"]:
-							category_record[category]["corr"] += 1
-						else:
-							category_record[category]["wrong"] += 1
 			success = True
 		except Exception as e:
 			print("Error", e)
@@ -153,40 +156,49 @@ def evaluate(subjects):
 	if not subjects:
 		subjects = list(test_df.keys())
 	print("assigned subjects", subjects)
+	lock = threading.Lock()
 	for subject in subjects:
 		test_data = test_df[subject]
 		output_res_path = os.path.join(output_dir, subject + "_result.json")
 		output_summary_path = os.path.join(output_dir, subject + "_summary.json")
-		res, category_record = update_result(output_res_path)
+		res, category_record = update_result(output_res_path, lock)
 
-		for each in tqdm(test_data, smoothing=0.0):
-			label = each["answer"]
-			category = subject
-			pred, response, exist = run_single_question(each, dev_df, res)
-			if exist:
-				continue
-			if response is not None:
-				res, category_record = update_result(output_res_path)
-				if category not in category_record:
-					category_record[category] = {"corr": 0.0, "wrong": 0.0}
-				each["pred"] = pred
-				each["response"] = response
-				res.append(each)
-				if pred is not None:
-					if pred == label:
-						category_record[category]["corr"] += 1
+		with ThreadPoolExecutor(max_workers=args.parallel) as executor:
+			futures = {
+				executor.submit(run_single_question, each, dev_df, res): each
+				for each in test_data
+			}
+			for future in tqdm(
+				as_completed(futures), total=len(futures), smoothing=0.0
+			):
+				each = futures[future]
+				label = each["answer"]
+				category = subject
+				pred, response, exist = future.result()
+				if exist:
+					continue
+				if response is not None:
+					res, category_record = update_result(output_res_path, lock)
+					if category not in category_record:
+						category_record[category] = {"corr": 0.0, "wrong": 0.0}
+					each["pred"] = pred
+					each["response"] = response
+					res.append(each)
+					if pred is not None:
+						if pred == label:
+							category_record[category]["corr"] += 1
+						else:
+							category_record[category]["wrong"] += 1
 					else:
 						category_record[category]["wrong"] += 1
-				else:
-					category_record[category]["wrong"] += 1
-				save_res(res, output_res_path)
-				save_summary(category_record, output_summary_path)
-				res, category_record = update_result(output_res_path)
-		save_res(res, output_res_path)
-		save_summary(category_record, output_summary_path)
+					save_res(res, output_res_path, lock)
+					save_summary(category_record, output_summary_path, lock)
+					res, category_record = update_result(output_res_path, lock)
+		save_res(res, output_res_path, lock)
+		save_summary(category_record, output_summary_path, lock)
 
 
-def save_res(res, output_res_path):
+def save_res(res, output_res_path, lock):
 	temp = []
 	exist_q_id = []
 	for each in res:
@@ -196,11 +208,12 @@ def save_res(res, output_res_path):
 		else:
 			continue
 	res = temp
-	with open(output_res_path, "w") as fo:
-		fo.write(json.dumps(res))
+	with lock:
+		with open(output_res_path, "w") as fo:
+			fo.write(json.dumps(res))
 
 
-def save_summary(category_record, output_summary_path):
+def save_summary(category_record, output_summary_path, lock):
 	total_corr = 0.0
 	total_wrong = 0.0
 	for k, v in category_record.items():
@@ -212,12 +225,16 @@ def save_summary(category_record, output_summary_path):
 		total_wrong += v["wrong"]
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
-	print(f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%")
-	with open(output_summary_path, "w") as fo:
-		fo.write(json.dumps(category_record))
+	print(
+		f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%"
+	)
+	with lock:
+		with open(output_summary_path, "w") as fo:
+			fo.write(json.dumps(category_record))
+
 
 if __name__ == '__main__':
 	assigned_subject = [args.category] if args.category != "all" else []
-	output_dir = "eval_results/"+re.sub(r"\W", "-", args.model)
+	output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
 	os.makedirs(output_dir, exist_ok=True)
 	evaluate(assigned_subject)
