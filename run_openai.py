@@ -8,12 +8,17 @@ from datasets import load_dataset
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--url", help="base_url, default=localhost:11434/v1", default="http://localhost:11434'/v1")
-parser.add_argument("--api", help="api key, default=api", default='api')
+parser.add_argument(
+	"--url",
+	help="base_url, default=localhost:11434/v1",
+	default="http://localhost:11434'/v1",
+)
+parser.add_argument("--api", help="api key, default=api", default="api")
 parser.add_argument("--model", help="Model name, default=llama3", default="llama3")
 parser.add_argument("--category", type=str, default="all")
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api)
+
 
 def get_completion(prompt: str):
 	response = client.chat.completions.create(
@@ -21,19 +26,16 @@ def get_completion(prompt: str):
 		messages=[
 			{
 				"role": "system",
-				"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
+				"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`.",
 			},
-			{
-				"role": "user",
-				"content": prompt
-			}
+			{"role": "user", "content": prompt},
 		],
 		temperature=0.1,
 		max_tokens=4096,
 		top_p=1,
 		frequency_penalty=0,
 		presence_penalty=0,
-		stop=["Question:"]
+		stop=["Question:"],
 	)
 
 	return response.choices[0].message.content
@@ -87,7 +89,7 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
-		#print("extraction failed")
+		# print("extraction failed")
 		return None
 
 
@@ -95,8 +97,11 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 	exist = True
 	q_id = single_question["question_id"]
 	for each in exist_result:
-		if q_id == each["question_id"] and single_question["question"] == each["question"]:
-			#print("already exists, skip it")
+		if (
+			q_id == each["question_id"]
+			and single_question["question"] == each["question"]
+		):
+			# print("already exists, skip it")
 			return each["pred"], each["response"], exist
 	exist = False
 	category = single_question["category"]
@@ -135,7 +140,7 @@ def update_result(output_res_path):
 							x = random.randint(0, len(each["options"]) - 1)
 							if x == each["answer_index"]:
 								category_record[category]["corr"] += 1
-								#print("random hit.")
+								# print("random hit.")
 							else:
 								category_record[category]["wrong"] += 1
 						elif each["pred"] == each["answer"]:
@@ -212,12 +217,15 @@ def save_summary(category_record, output_summary_path):
 		total_wrong += v["wrong"]
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
-	print(f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%")
+	print(
+		f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%"
+	)
 	with open(output_summary_path, "w") as fo:
 		fo.write(json.dumps(category_record))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
 	assigned_subject = [args.category] if args.category != "all" else []
-	output_dir = "eval_results/"+re.sub(r"\W", "-", args.model)
+	output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
 	os.makedirs(output_dir, exist_ok=True)
 	evaluate(assigned_subject)
