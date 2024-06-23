@@ -1,0 +1,5 @@
+# set to use tabs instead of spaces
+set expandtab
+
+# set tab size to 2
+set tabstop=2
