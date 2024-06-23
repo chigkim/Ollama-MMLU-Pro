@@ -8,6 +8,8 @@ from datasets import load_dataset
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import time
+from datetime import timedelta
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -19,7 +21,7 @@ parser.add_argument("--api", help="api key, default=api", default="api")
 parser.add_argument("--model", help="Model name, default=llama3", default="llama3")
 parser.add_argument("--category", type=str, default="all")
 parser.add_argument(
-		"--parallel", type=int, default=1, help="Number of parallel requests"
+	"--parallel", type=int, default=1, help="Number of parallel requests"
 )
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api)
@@ -241,9 +243,14 @@ def save_summary(category_record, output_summary_path, lock):
 			fo.write(json.dumps(category_record))
 
 
-
 if __name__ == "__main__":
 	assigned_subject = [args.category] if args.category != "all" else []
 	output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
 	os.makedirs(output_dir, exist_ok=True)
+	start = time.time()
 	evaluate(assigned_subject)
+	duration = start - time.time()
+	duration_td = timedelta(seconds=duration)
+	hours, remainder = divmod(duration_td.seconds, 3600)
+	minutes, seconds = divmod(remainder, 60)
+	print(f"Finished in: {hours} hours, {minutes} minutes, {seconds} seconds")
