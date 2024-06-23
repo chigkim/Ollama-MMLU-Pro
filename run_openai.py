@@ -174,8 +174,7 @@ def evaluate(subjects):
 	print("assigned subjects", subjects)
 	lock = threading.Lock()
 	for subject in subjects:
-		if args.verbosity >= 1:
-			print(f"Testing {subject}...")
+		print(f"Testing {subject}...")
 		test_data = test_df[subject]
 		output_res_path = os.path.join(output_dir, subject + "_result.json")
 		output_summary_path = os.path.join(output_dir, subject + "_summary.json")
@@ -210,12 +209,14 @@ def evaluate(subjects):
 					else:
 						category_record[category]["wrong"] += 1
 					save_res(res, output_res_path, lock)
-					save_summary(category_record, output_summary_path, lock)
+					if args.verbosity >= 1:
+						save_summary(category_record, output_summary_path, lock, report=True)
+					else:
+						save_summary(category_record, output_summary_path, lock)
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
-		save_summary(category_record, output_summary_path, lock)
-		if args.verbosity >= 1:
-			print(f"Finished testing {subject}.")
+		save_summary(category_record, output_summary_path, lock, report=True)
+		print(f"Finished testing {subject}.")
 
 
 def save_res(res, output_res_path, lock):
@@ -233,7 +234,7 @@ def save_res(res, output_res_path, lock):
 			fo.write(json.dumps(res))
 
 
-def save_summary(category_record, output_summary_path, lock):
+def save_summary(category_record, output_summary_path, lock, report=False):
 	total_corr = 0.0
 	total_wrong = 0.0
 	for k, v in category_record.items():
@@ -245,7 +246,7 @@ def save_summary(category_record, output_summary_path, lock):
 		total_wrong += v["wrong"]
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
-	if args.verbosity >= 1:
+	if report:
 		print(
 			f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%"
 		)
