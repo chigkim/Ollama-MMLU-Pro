@@ -23,6 +23,9 @@ parser.add_argument("--category", type=str, default="all")
 parser.add_argument(
 	"--parallel", type=int, default=1, help="Number of parallel requests"
 )
+parser.add_argument(
+	"--verbosity", type=int, help="Verbosity level 0-2, default=1", default=1
+)
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api)
 
@@ -96,7 +99,8 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
-		# print("extraction failed")
+		if args.verbosity >= 2:
+			print("extraction failed")
 		return None
 
 
@@ -108,7 +112,8 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 			q_id == each["question_id"]
 			and single_question["question"] == each["question"]
 		):
-			# print("already exists, skip it")
+			if args.verbosity >= 2:
+				print("already exists, skipping.")
 			return each["pred"], each["response"], exist
 	exist = False
 	category = single_question["category"]
@@ -152,7 +157,8 @@ def update_result(output_res_path, lock):
 									category_record[category]["wrong"] += 1
 							elif each["pred"] == each["answer"]:
 								category_record[category]["corr"] += 1
-								# print("random hit.")
+								if args.verbosity == 2:
+									print("random hit.")
 							else:
 								category_record[category]["wrong"] += 1
 			success = True
@@ -168,6 +174,8 @@ def evaluate(subjects):
 	print("assigned subjects", subjects)
 	lock = threading.Lock()
 	for subject in subjects:
+		if args.verbosity >= 1:
+			print(f"Testing {subject}...")
 		test_data = test_df[subject]
 		output_res_path = os.path.join(output_dir, subject + "_result.json")
 		output_summary_path = os.path.join(output_dir, subject + "_summary.json")
@@ -206,6 +214,8 @@ def evaluate(subjects):
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
 		save_summary(category_record, output_summary_path, lock)
+		if args.verbosity >= 1:
+			print(f"Finished testing {subject}.")
 
 
 def save_res(res, output_res_path, lock):
@@ -235,9 +245,10 @@ def save_summary(category_record, output_summary_path, lock):
 		total_wrong += v["wrong"]
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
-	print(
-		f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%"
-	)
+	if args.verbosity >= 1:
+		print(
+			f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%"
+		)
 	with lock:
 		with open(output_summary_path, "w") as fo:
 			fo.write(json.dumps(category_record))
@@ -249,8 +260,10 @@ if __name__ == "__main__":
 	os.makedirs(output_dir, exist_ok=True)
 	start = time.time()
 	evaluate(assigned_subject)
-	duration = start - time.time()
+	duration = time.time() - start
 	duration_td = timedelta(seconds=duration)
 	hours, remainder = divmod(duration_td.seconds, 3600)
 	minutes, seconds = divmod(remainder, 60)
-	print(f"Finished in: {hours} hours, {minutes} minutes, {seconds} seconds")
+	print(
+		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
+	)
