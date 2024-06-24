@@ -51,7 +51,6 @@ def get_completion(prompt: str):
 	)
 	if args.verbosity >= 3:
 		print("\nResponse:", response.choices[0].message.content)
-
 	return response.choices[0].message.content
 
 
@@ -83,7 +82,7 @@ def preprocess(test_df):
 
 def format_example(question, options, cot_content=""):
 	if cot_content == "":
-		cot_content = "Let think step by step."
+		cot_content = "Let's think step by step."
 	if cot_content.startswith("A: "):
 		cot_content = cot_content[3:]
 	example = "Question: {}\nOptions: ".format(question)
