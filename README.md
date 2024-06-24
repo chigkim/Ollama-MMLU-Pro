@@ -6,11 +6,11 @@ This is a modified version of [TIGER-AI-Lab/MMLU-Pro](https://github.com/TIGER-A
 
 ## Usage
 
-For example, in order to run benchmark against llama3 on Ollama, use:
+For example, in order to run benchmark against Phi3 on Ollama, use:
 
 ```shell
 pip install -r requirements.txt
-python run_openai.py --url http://localhost:11434/v1 --model llama3
+python run_openai.py --url http://localhost:11434/v1 --model phi3
 ```
 
 As default, it tests against all subjects, but you can use --category option to test only specific subject.
