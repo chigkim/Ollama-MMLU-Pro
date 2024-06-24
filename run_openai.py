@@ -24,13 +24,15 @@ parser.add_argument(
 	"--parallel", type=int, default=1, help="Number of parallel requests"
 )
 parser.add_argument(
-	"--verbosity", type=int, help="Verbosity level 0-2, default=1", default=1
+	"--verbosity", type=int, help="Verbosity level 0-3, default=0", default=0
 )
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api)
 
 
 def get_completion(prompt: str):
+	if args.verbosity >= 3:
+		print("\nPrompt:", prompt)
 	response = client.chat.completions.create(
 		model=args.model,
 		messages=[
@@ -47,6 +49,8 @@ def get_completion(prompt: str):
 		presence_penalty=0,
 		stop=["Question:"],
 	)
+	if args.verbosity >= 3:
+		print("\nResponse:", response.choices[0].message.content)
 
 	return response.choices[0].message.content
 
