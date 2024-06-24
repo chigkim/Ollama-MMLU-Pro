@@ -216,7 +216,6 @@ def evaluate(subjects):
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
 		save_summary(category_record, output_summary_path, lock, report=True)
-		print(f"Finished testing {subject}.")
 
 
 def save_res(res, output_res_path, lock):
