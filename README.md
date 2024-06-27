@@ -17,6 +17,8 @@ As default, it tests against all subjects, but you can use --category option to 
 
 Subjects include: 'business', 'law', 'psychology', 'biology', 'chemistry', 'history', 'other', 'health', 'economics', 'math', 'physics', 'computer science', 'philosophy', 'engineering'
 
+The default timeout is 600 seconds (10 minutes). If the model being tested takes a long time to respond, and you encounter   "error Request timed out" message, use --timeout number_of_seconds option to increase.
+
 ### Parallelism
 
 You can optionally run multiple tests in parallel by using --parallel option. For example, to run 2 tests in parallel:
