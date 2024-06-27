@@ -26,8 +26,15 @@ parser.add_argument(
 parser.add_argument(
 	"--verbosity", type=int, help="Verbosity level 0-3, default=0", default=0
 )
+parser.add_argument(
+	"--timeout",
+	type=float,
+	default=600.0,
+	help="Request timeout in seconds. Default = 600 seconds.",
+)
+
 args = parser.parse_args()
-client = OpenAI(base_url=args.url, api_key=args.api)
+client = OpenAI(base_url=args.url, api_key=args.api, timeout=args.timeout)
 
 
 def get_completion(prompt: str):
@@ -48,6 +55,7 @@ def get_completion(prompt: str):
 		frequency_penalty=0,
 		presence_penalty=0,
 		stop=["Question:"],
+		timeout=args.timeout,
 	)
 	if args.verbosity >= 3:
 		print("\nResponse:", response.choices[0].message.content)
@@ -213,7 +221,9 @@ def evaluate(subjects):
 						category_record[category]["wrong"] += 1
 					save_res(res, output_res_path, lock)
 					if args.verbosity >= 1:
-						save_summary(category_record, output_summary_path, lock, report=True)
+						save_summary(
+							category_record, output_summary_path, lock, report=True
+						)
 					else:
 						save_summary(category_record, output_summary_path, lock)
 					res, category_record = update_result(output_res_path, lock)
