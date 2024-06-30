@@ -172,12 +172,12 @@ def update_result(output_res_path, lock):
 								x = random.randint(0, len(each["options"]) - 1)
 								if x == each["answer_index"]:
 									category_record[category]["corr"] += 1
+									if args.verbosity == 2:
+										print("random hit.")
 								else:
 									category_record[category]["wrong"] += 1
 							elif each["pred"] == each["answer"]:
 								category_record[category]["corr"] += 1
-								if args.verbosity == 2:
-									print("random hit.")
 							else:
 								category_record[category]["wrong"] += 1
 			success = True
