@@ -10,6 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 from datetime import timedelta
+import codecs
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -32,14 +33,14 @@ parser.add_argument(
 	default=600.0,
 	help="Request timeout in seconds. Default = 600 seconds.",
 )
-
+parser.add_argument(
+	"--log", help="Writes exact prompt and response into log.txt", action="store_true"
+)
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api, timeout=args.timeout)
 
 
 def get_completion(prompt: str):
-	if args.verbosity >= 3:
-		print("\nPrompt:", prompt)
 	response = client.chat.completions.create(
 		model=args.model,
 		messages=[
@@ -57,8 +58,6 @@ def get_completion(prompt: str):
 		stop=["Question:"],
 		timeout=args.timeout,
 	)
-	if args.verbosity >= 3:
-		print("\nResponse:", response.choices[0].message.content)
 	return response.choices[0].message.content
 
 
@@ -115,7 +114,7 @@ def extract_answer(text):
 		return None
 
 
-def run_single_question(single_question, cot_examples_dict, exist_result):
+def run_single_question(single_question, cot_examples_dict, exist_result, lock):
 	exist = True
 	q_id = single_question["question_id"]
 	for each in exist_result:
@@ -137,6 +136,15 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 	prompt += format_example(question, options).strip()
 	try:
 		response = get_completion(prompt)
+		if args.verbosity >= 3:
+			print("\nPrompt:", prompt)
+			print(f"\nResponse: {response.choices[0].message.content}")
+		if args.log:
+			with lock:
+				with codecs.open(log_path, "a", "utf-8") as file:
+					file.write(f"Prompt: {prompt}\n")
+					file.write(f"Response: {response}\n")
+					file.write(f"Answer Key: {single_question['answer']}\n")
 		prompt = response
 	except Exception as e:
 		print("error", e)
@@ -193,7 +201,7 @@ def evaluate(subjects):
 
 		with ThreadPoolExecutor(max_workers=args.parallel) as executor:
 			futures = {
-				executor.submit(run_single_question, each, dev_df, res): each
+				executor.submit(run_single_question, each, dev_df, res, lock): each
 				for each in test_data
 			}
 			for future in tqdm(
@@ -267,10 +275,12 @@ def save_summary(category_record, output_summary_path, lock, report=False):
 			fo.write(json.dumps(category_record))
 
 
+output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
+log_path = os.path.join(output_dir, "log.txt")
+
 if __name__ == "__main__":
-	assigned_subject = [args.category] if args.category != "all" else []
-	output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
 	os.makedirs(output_dir, exist_ok=True)
+	assigned_subject = [args.category] if args.category != "all" else []
 	start = time.time()
 	evaluate(assigned_subject)
 	duration = time.time() - start
