@@ -58,7 +58,7 @@ def get_completion(prompt: str):
 		stop=["Question:"],
 		timeout=args.timeout,
 	)
-	return response.choices[0].message.content
+	return response.choices[0].message.content.strip()
 
 
 def load_mmlu_pro():
@@ -136,20 +136,18 @@ def run_single_question(single_question, cot_examples_dict, exist_result, lock):
 	prompt += format_example(question, options).strip()
 	try:
 		response = get_completion(prompt)
-		if args.verbosity >= 3:
-			print("\nPrompt:", prompt)
-			print(f"\nResponse: {response.choices[0].message.content}")
-		if args.log:
-			with lock:
-				with codecs.open(log_path, "a", "utf-8") as file:
-					file.write(f"Prompt: {prompt}\n")
-					file.write(f"Response: {response}\n")
-					file.write(f"Answer Key: {single_question['answer']}\n")
-		prompt = response
 	except Exception as e:
 		print("error", e)
 		return None, None, exist
 	pred = extract_answer(response)
+	log_json  = {"id": q_id, "prompt": prompt, "response":response, "pred": pred, "answer": single_question['answer']}
+	log_content = json.dumps(log_json, indent="\t")
+	if args.verbosity >= 3:
+		print("\n"+log_content)
+	if args.log:
+		with lock:
+			with codecs.open(log_path, "a", "utf-8") as file:
+				file.write(log_content+"\n")
 	return pred, response, exist
 
 
