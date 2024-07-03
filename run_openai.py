@@ -140,14 +140,20 @@ def run_single_question(single_question, cot_examples_dict, exist_result, lock):
 		print("error", e)
 		return None, None, exist
 	pred = extract_answer(response)
-	log_json  = {"id": q_id, "prompt": prompt, "response":response, "pred": pred, "answer": single_question['answer']}
+	log_json = {
+		"id": q_id,
+		"prompt": prompt,
+		"response": response,
+		"pred": pred,
+		"answer": single_question["answer"],
+	}
 	log_content = json.dumps(log_json, indent="\t")
 	if args.verbosity >= 3:
-		print("\n"+log_content)
+		print("\n" + log_content)
 	if args.log:
 		with lock:
 			with codecs.open(log_path, "a", "utf-8") as file:
-				file.write(log_content+"\n")
+				file.write(log_content + "\n")
 	return pred, response, exist
 
 
@@ -281,6 +287,17 @@ if __name__ == "__main__":
 	assigned_subject = [args.category] if args.category != "all" else []
 	start = time.time()
 	evaluate(assigned_subject)
+	total_corr = 0.0
+	total_wrong = 0.0
+	for file in os.listdir(output_dir):
+		if "summary.json" in file:
+			res = json.load(open(os.path.join(output_dir, file)))
+			total_corr += res["total"]["corr"]
+			total_wrong += res["total"]["wrong"]
+	acc = total_corr / (total_corr + total_wrong)
+	print(
+		f"\nTotal Correct: {int(total_corr)}/{int(total_corr+total_wrong)}, Total Score: {acc*100:.2f}%"
+	)
 	duration = time.time() - start
 	duration_td = timedelta(seconds=duration)
 	hours, remainder = divmod(duration_td.seconds, 3600)
