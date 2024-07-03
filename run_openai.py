@@ -34,22 +34,16 @@ parser.add_argument(
 	help="Request timeout in seconds. Default = 600 seconds.",
 )
 parser.add_argument(
-	"--log", help="Writes exact prompt and response into log.txt", action="store_true"
+	"--log_prompt", help="Writes exact prompt into test result.", action="store_true"
 )
 args = parser.parse_args()
 client = OpenAI(base_url=args.url, api_key=args.api, timeout=args.timeout)
 
 
-def get_completion(prompt: str):
+def get_completion(prompt):
 	response = client.chat.completions.create(
 		model=args.model,
-		messages=[
-			{
-				"role": "system",
-				"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`.",
-			},
-			{"role": "user", "content": prompt},
-		],
+		messages=prompt,
 		temperature=0.1,
 		max_tokens=4096,
 		top_p=1,
@@ -114,7 +108,7 @@ def extract_answer(text):
 		return None
 
 
-def run_single_question(single_question, cot_examples_dict, exist_result, lock):
+def run_single_question(single_question, cot_examples_dict, exist_result):
 	exist = True
 	q_id = single_question["question_id"]
 	for each in exist_result:
@@ -134,27 +128,20 @@ def run_single_question(single_question, cot_examples_dict, exist_result, lock):
 	for each in cot_examples:
 		prompt += format_example(each["question"], each["options"], each["cot_content"])
 	prompt += format_example(question, options).strip()
+	prompt = [
+		{
+			"role": "system",
+			"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`.",
+		},
+		{"role": "user", "content": prompt},
+	]
 	try:
 		response = get_completion(prompt)
 	except Exception as e:
 		print("error", e)
-		return None, None, exist
+		return None, None, None, exist
 	pred = extract_answer(response)
-	log_json = {
-		"id": q_id,
-		"prompt": prompt,
-		"response": response,
-		"pred": pred,
-		"answer": single_question["answer"],
-	}
-	log_content = json.dumps(log_json, indent="\t")
-	if args.verbosity >= 3:
-		print("\n" + log_content)
-	if args.log:
-		with lock:
-			with codecs.open(log_path, "a", "utf-8") as file:
-				file.write(log_content + "\n")
-	return pred, response, exist
+	return prompt, response, pred, exist
 
 
 def update_result(output_res_path, lock):
@@ -176,7 +163,7 @@ def update_result(output_res_path, lock):
 								x = random.randint(0, len(each["options"]) - 1)
 								if x == each["answer_index"]:
 									category_record[category]["corr"] += 1
-									if args.verbosity == 2:
+									if args.verbosity >= 2:
 										print("random hit.")
 								else:
 									category_record[category]["wrong"] += 1
@@ -205,7 +192,7 @@ def evaluate(subjects):
 
 		with ThreadPoolExecutor(max_workers=args.parallel) as executor:
 			futures = {
-				executor.submit(run_single_question, each, dev_df, res, lock): each
+				executor.submit(run_single_question, each, dev_df, res): each
 				for each in test_data
 			}
 			for future in tqdm(
@@ -214,16 +201,27 @@ def evaluate(subjects):
 				each = futures[future]
 				label = each["answer"]
 				category = subject
-				pred, response, exist = future.result()
+				prompt, response, pred, exist = future.result()
 				if exist:
 					continue
 				if response is not None:
 					res, category_record = update_result(output_res_path, lock)
 					if category not in category_record:
 						category_record[category] = {"corr": 0.0, "wrong": 0.0}
-					each["pred"] = pred
+					if args.log_prompt:
+						each["prompt"] = prompt
 					each["response"] = response
+					each["pred"] = pred
 					res.append(each)
+					if args.verbosity >= 3:
+						log_json = {
+							"id": each["question_id"],
+							"question": each["question"],
+							"response": each["response"],
+							"pred": each["pred"],
+							"answer": each["answer"],
+						}
+						print("\n" + json.dumps(log_json, indent="\t"))
 					if pred is not None:
 						if pred == label:
 							category_record[category]["corr"] += 1
@@ -255,7 +253,7 @@ def save_res(res, output_res_path, lock):
 	res = temp
 	with lock:
 		with open(output_res_path, "w") as fo:
-			fo.write(json.dumps(res))
+			fo.write(json.dumps(res, indent="\t"))
 
 
 def save_summary(category_record, output_summary_path, lock, report=False):
@@ -276,13 +274,11 @@ def save_summary(category_record, output_summary_path, lock, report=False):
 		)
 	with lock:
 		with open(output_summary_path, "w") as fo:
-			fo.write(json.dumps(category_record))
+			fo.write(json.dumps(category_record, indent="\t"))
 
-
-output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
-log_path = os.path.join(output_dir, "log.txt")
 
 if __name__ == "__main__":
+	output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
 	os.makedirs(output_dir, exist_ok=True)
 	assigned_subject = [args.category] if args.category != "all" else []
 	start = time.time()
