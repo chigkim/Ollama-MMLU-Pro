@@ -5,52 +5,36 @@ import random
 from tqdm import tqdm
 from openai import OpenAI
 from datasets import load_dataset
-import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 import time
 from datetime import timedelta
 import codecs
+import tomllib
+import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-	"--url",
-	help="base_url, default=localhost:11434/v1",
-	default="http://localhost:11434'/v1",
-)
-parser.add_argument("--api", help="api key, default=api", default="api")
-parser.add_argument("--model", help="Model name, default=llama3", default="llama3")
-parser.add_argument("--category", type=str, default="all")
-parser.add_argument(
-	"--parallel", type=int, default=1, help="Number of parallel requests"
-)
-parser.add_argument(
-	"--verbosity", type=int, help="Verbosity level 0-3, default=0", default=0
-)
-parser.add_argument(
-	"--timeout",
-	type=float,
-	default=600.0,
-	help="Request timeout in seconds. Default = 600 seconds.",
-)
-parser.add_argument(
-	"--log_prompt", help="Writes exact prompt into test result.", action="store_true"
+	"-c", "--config",
+	help="Configuration file. Default=config.toml",
+	default="config.toml",
 )
 args = parser.parse_args()
-client = OpenAI(base_url=args.url, api_key=args.api, timeout=args.timeout)
+config = tomllib.load(open(args.config, "rb"))
+client = OpenAI(base_url=config["server"]["host"], api_key=config["server"]["api_key"], timeout=config["server"]["timeout"])
 
 
 def get_completion(prompt):
 	response = client.chat.completions.create(
-		model=args.model,
+		model=config["server"]["model"],
 		messages=prompt,
-		temperature=0.1,
-		max_tokens=4096,
-		top_p=1,
+		temperature=config["inference"]["temperature"],
+		max_tokens=config["inference"]["max_tokens"],
+		top_p=config["inference"]["top_p"],
 		frequency_penalty=0,
 		presence_penalty=0,
 		stop=["Question:"],
-		timeout=args.timeout,
+		timeout=config["server"]["timeout"],
 	)
 	return response.choices[0].message.content.strip()
 
@@ -103,7 +87,7 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
-		if args.verbosity >= 2:
+		if config["log"]["verbosity"] >= 2:
 			print("extraction failed")
 		return None
 
@@ -116,9 +100,9 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 			q_id == each["question_id"]
 			and single_question["question"] == each["question"]
 		):
-			if args.verbosity >= 2:
+			if config["log"]["verbosity"] >= 2:
 				print("already exists, skipping.")
-			return each["pred"], each["response"], exist
+			return None, None, None, exist
 	exist = False
 	category = single_question["category"]
 	cot_examples = cot_examples_dict[category]
@@ -131,7 +115,7 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 	prompt = [
 		{
 			"role": "system",
-			"content": "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`.",
+			"content": config["inference"]["system_prompt"],
 		},
 		{"role": "user", "content": prompt},
 	]
@@ -158,15 +142,16 @@ def update_result(output_res_path, lock):
 							category = each["category"]
 							if category not in category_record:
 								category_record[category] = {"corr": 0.0, "wrong": 0.0}
+								category_record["random"] = {"corr": 0.0, "wrong": 0.0}
 							if not each["pred"]:
 								random.seed(12345)
 								x = random.randint(0, len(each["options"]) - 1)
 								if x == each["answer_index"]:
 									category_record[category]["corr"] += 1
-									if args.verbosity >= 2:
-										print("random hit.")
+									category_record["random"]["corr"] += 1
 								else:
 									category_record[category]["wrong"] += 1
+									category_record["random"]["wrong"] += 1
 							elif each["pred"] == each["answer"]:
 								category_record[category]["corr"] += 1
 							else:
@@ -184,13 +169,14 @@ def evaluate(subjects):
 	print("assigned subjects", subjects)
 	lock = threading.Lock()
 	for subject in subjects:
+		start = time.time()
 		print(f"Testing {subject}...")
 		test_data = test_df[subject]
 		output_res_path = os.path.join(output_dir, subject + "_result.json")
 		output_summary_path = os.path.join(output_dir, subject + "_summary.json")
 		res, category_record = update_result(output_res_path, lock)
 
-		with ThreadPoolExecutor(max_workers=args.parallel) as executor:
+		with ThreadPoolExecutor(max_workers=config["test"]["parallel"]) as executor:
 			futures = {
 				executor.submit(run_single_question, each, dev_df, res): each
 				for each in test_data
@@ -208,12 +194,12 @@ def evaluate(subjects):
 					res, category_record = update_result(output_res_path, lock)
 					if category not in category_record:
 						category_record[category] = {"corr": 0.0, "wrong": 0.0}
-					if args.log_prompt:
+					if config["log"]["log_prompt"]:
 						each["prompt"] = prompt
 					each["response"] = response
 					each["pred"] = pred
 					res.append(each)
-					if args.verbosity >= 3:
+					if config["log"]["verbosity"] >= 3:
 						log_json = {
 							"id": each["question_id"],
 							"question": each["question"],
@@ -230,7 +216,7 @@ def evaluate(subjects):
 					else:
 						category_record[category]["wrong"] += 1
 					save_res(res, output_res_path, lock)
-					if args.verbosity >= 1:
+					if config["log"]["verbosity"] >= 1:
 						save_summary(
 							category_record, output_summary_path, lock, report=True
 						)
@@ -239,6 +225,10 @@ def evaluate(subjects):
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
 		save_summary(category_record, output_summary_path, lock, report=True)
+		hours, minutes, seconds = elapsed(start)
+		print(
+			f"Finished testing {subject} in {hours} hours, {minutes} minutes, {seconds} seconds."
+		)
 
 
 def save_res(res, output_res_path, lock):
@@ -255,12 +245,21 @@ def save_res(res, output_res_path, lock):
 		with open(output_res_path, "w") as fo:
 			fo.write(json.dumps(res, indent="\t"))
 
+def print_score(label, corr, wrong):
+	corr = int(corr)
+	wrong = int(wrong)
+	total = corr+wrong
+	acc = corr/total*100
+	print(
+		f"{label}, Correct: {corr}/{total}, Score: {acc:.2f}%"
+	)
+
 
 def save_summary(category_record, output_summary_path, lock, report=False):
 	total_corr = 0.0
 	total_wrong = 0.0
 	for k, v in category_record.items():
-		if k == "total":
+		if k == "total" or k == "random":
 			continue
 		cat_acc = v["corr"] / (v["corr"] + v["wrong"])
 		category_record[k]["acc"] = cat_acc
@@ -269,35 +268,63 @@ def save_summary(category_record, output_summary_path, lock, report=False):
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
 	if report:
-		print(
-			f"\nCorrect: {int(total_corr)}/{int(total_corr+total_wrong)}, Score: {acc*100:.2f}%"
-		)
+		print_score("Category Total", total_corr, total_wrong)
+		if "random" in category_record:
+			random_corr = category_record["random"]["corr"]
+			random_wrong = category_record["random"]["wrong"]
+			print_score("Category Random", random_corr, random_wrong)
+			print_score("Category Random Subtracted", total_corr-random_corr, total_wrong-random_wrong)
 	with lock:
 		with open(output_summary_path, "w") as fo:
 			fo.write(json.dumps(category_record, indent="\t"))
 
 
-if __name__ == "__main__":
-	output_dir = "eval_results/" + re.sub(r"\W", "-", args.model)
-	os.makedirs(output_dir, exist_ok=True)
-	assigned_subject = [args.category] if args.category != "all" else []
-	start = time.time()
-	evaluate(assigned_subject)
+def final_report():
 	total_corr = 0.0
 	total_wrong = 0.0
+	random_corr = 0.0
+	random_wrong = 0.0
+	files = os.listdir(output_dir)
+	files.append("total_summary.json")
+	files = [file.replace("_summary.json", "") for file in files if "summary.json" in file]
+	table = "| "+" | ".join(files)+" |\n"
+	table += re.sub(r"\w", "-", table)
+	scores = []
 	for file in os.listdir(output_dir):
 		if "summary.json" in file:
 			res = json.load(open(os.path.join(output_dir, file)))
 			total_corr += res["total"]["corr"]
 			total_wrong += res["total"]["wrong"]
-	acc = total_corr / (total_corr + total_wrong)
-	print(
-		f"\nTotal Correct: {int(total_corr)}/{int(total_corr+total_wrong)}, Total Score: {acc*100:.2f}%"
-	)
+			scores.append(total_corr/(total_corr+total_wrong))
+			if "random" in res:
+				random_corr += res["random"]["corr"]
+				random_wrong += res["random"]["wrong"]
+	print_score("Combined Total", total_corr, total_wrong)
+	if random_corr and random_wrong:
+		print_score("Combined Random", random_corr, random_wrong)
+		print_score("Combined  Random Subtracted", total_corr-random_corr, total_wrong-random_wrong)
+	scores.append(total_corr/(total_corr+total_wrong))
+	scores = [f"{score*100:.2f}" for score in scores]
+	table += "| "+" | ".join(scores)+" |"
+	print(table)
+
+
+def elapsed(start):
 	duration = time.time() - start
 	duration_td = timedelta(seconds=duration)
 	hours, remainder = divmod(duration_td.seconds, 3600)
 	minutes, seconds = divmod(remainder, 60)
+	return hours, minutes, seconds
+
+
+if __name__ == "__main__":
+	output_dir = "eval_results/" + re.sub(r"\W", "-", config["server"]["model"])
+	os.makedirs(output_dir, exist_ok=True)
+	assigned_subject = config["test"]["category"]
+	start = time.time()
+	evaluate(assigned_subject)
+	final_report()
+	hours, minutes, seconds = elapsed(start)
 	print(
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)

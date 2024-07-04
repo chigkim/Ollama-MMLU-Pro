@@ -1,0 +1,22 @@
+[server]
+host = "http://localhost:11434/v1"
+api_key = "api key"
+model = "llama3"
+timeout = 600.0
+
+[inference]
+# Ssettings   below are from MMLU Pro for GPT-4O
+temperature = 0.1
+top_p = 1.0
+max_tokens = 4096
+system_prompt = "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
+
+[test]
+category = ["business", "law", "psychology", "biology", "chemistry", "history", "other", "health", "economics", "math", "physics", "computer science", "philosophy", "engineering"]
+parallel = 1
+
+[log]
+# Verbosity between 0-3
+verbosity = 0
+# If true, logs exact prompt sent to the model in the test result files.
+log_prompt = false
