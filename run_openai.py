@@ -19,8 +19,46 @@ parser.add_argument(
 	help="Configuration file. Default=config.toml",
 	default="config.toml",
 )
+parser.add_argument(
+	"--host",
+	help="host url",
+)
+parser.add_argument("--api", help="api key")
+parser.add_argument("--model", help="Model name")
+parser.add_argument(
+	"--timeout",
+	type=float,
+	help="Request timeout in seconds",
+)
+parser.add_argument("--category", type=str)
+parser.add_argument(
+	"--parallel", type=int, help="Number of parallel requests"
+)
+parser.add_argument(
+	"--verbosity", type=int, help="Verbosity level 0-3"
+)
+parser.add_argument(
+	"--log_prompt", help="Writes exact prompt and response into log.txt", action="store_true"
+)
 args = parser.parse_args()
 config = tomllib.load(open(args.config, "rb"))
+if args.host:
+	config["server"]["host"] = args.host
+if args.api:
+	config["server"]["api_key"] = args.api
+if args.model:
+	config["server"]["model"] = args.model
+if args.timeout:
+	config["server"]["timeout"] = args.timeout
+if args.category:
+	config["test"]["categories"] = [args.category]
+if args.parallel:
+	config["test"]["parallel"] = args.parallel
+if args.verbosity:
+	config["log"]["verbosity"] = args.verbosity
+if args.log_prompt:
+	config["log"]["log_prompt"] = args.log_prompt
+print(config)
 client = OpenAI(base_url=config["server"]["host"], api_key=config["server"]["api_key"], timeout=config["server"]["timeout"])
 
 
@@ -308,6 +346,7 @@ def final_report():
 	scores.append(total_corr/(total_corr+total_wrong))
 	scores = [f"{score*100:.2f}" for score in scores]
 	table += "| "+" | ".join(scores)+" |"
+	print("Markdown Table:")
 	print(table)
 
 
@@ -325,8 +364,8 @@ if __name__ == "__main__":
 	assigned_subject = config["test"]["categories"]
 	start = time.time()
 	evaluate(assigned_subject)
-	final_report()
 	hours, minutes, seconds = elapsed(start)
 	print(
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
+	final_report()
