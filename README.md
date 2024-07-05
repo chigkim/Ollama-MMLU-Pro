@@ -4,6 +4,8 @@ This is a modified version of run_gpt4o.py from [TIGER-AI-Lab/MMLU-Pro](https://
 
 <a href="https://colab.research.google.com/github/chigkim/Ollama-MMLU-Pro/blob/main/Ollama_MMLU_Pro.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
+I kept the  testing method exactly the same as the original script, adding only a few features to simplify running the test and displaying the results.
+
 ## Usage
 
 Change the config.toml according to your setup.
@@ -15,7 +17,7 @@ python run_openai.py
 
 ## Notes
 
-* If an answer cannot be extracted from the model's response, the script will randomly assign an answer.
+* If an answer cannot be extracted from the model's response, the script will randomly assign an answer. It's the same way as the original script.
 * The total score represents the number of correct answers out of the total number of attempts. This is the score from the original script.
 * "Random Guess Attempts" indicates the total number of random guesses out of the total attempts.
 * "Correct Random Guesses" shows the number of random guesses that were correct out of all the random guesses.
