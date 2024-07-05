@@ -324,9 +324,10 @@ def final_report():
 	random_wrong = 0.0
 	files = os.listdir(output_dir)
 	files.append("total_summary.json")
-	files = [file.replace("_summary.json", "") for file in files if "summary.json" in file]
-	table = "| "+" | ".join(files)+" |\n"
-	table += re.sub(r"\w", "-", table)
+	names  = [file.replace("_summary.json", "") for file in files if "summary.json" in file]
+	table = "| "+" | ".join(names)+" |\n"
+	separators = [re.sub(r".", "-", name) for name in names]
+	table += "| "+" | ".join(separators)+" |\n"
 	scores = []
 	for file in os.listdir(output_dir):
 		if "summary.json" in file:
@@ -362,6 +363,7 @@ if __name__ == "__main__":
 	output_dir = "eval_results/" + re.sub(r"\W", "-", config["server"]["model"])
 	os.makedirs(output_dir, exist_ok=True)
 	assigned_subject = config["test"]["categories"]
+	assigned_subject.sort()
 	start = time.time()
 	evaluate(assigned_subject)
 	hours, minutes, seconds = elapsed(start)
