@@ -369,3 +369,4 @@ if __name__ == "__main__":
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
 	final_report()
+	
