@@ -20,8 +20,8 @@ parser.add_argument(
 	default="config.toml",
 )
 parser.add_argument(
-	"--host",
-	help="host url",
+	"--url",
+	help="server url",
 )
 parser.add_argument("--api", help="api key")
 parser.add_argument("--model", help="Model name")
@@ -42,8 +42,8 @@ parser.add_argument(
 )
 args = parser.parse_args()
 config = tomllib.load(open(args.config, "rb"))
-if args.host:
-	config["server"]["host"] = args.host
+if args.url:
+	config["server"]["url"] = args.url
 if args.api:
 	config["server"]["api_key"] = args.api
 if args.model:
@@ -59,7 +59,7 @@ if args.verbosity:
 if args.log_prompt:
 	config["log"]["log_prompt"] = args.log_prompt
 print(config)
-client = OpenAI(base_url=config["server"]["host"], api_key=config["server"]["api_key"], timeout=config["server"]["timeout"])
+client = OpenAI(base_url=config["server"]["url"], api_key=config["server"]["api_key"], timeout=config["server"]["timeout"])
 
 
 def get_completion(prompt):

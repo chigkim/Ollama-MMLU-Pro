@@ -1,5 +1,5 @@
 [server]
-host = "http://localhost:11434/v1"
+url = "http://localhost:11434/v1"
 api_key = "api key"
 model = "llama3"
 timeout = 600.0
