@@ -15,7 +15,9 @@ pip install -r requirements.txt
 python run_openai.py
 ```
 
-## Notes
+You can also override   settings in configuration file    with  command line flags like --model, ----category, etc. For example, if you   specify `--model phi3`, all the settings  from configuration file will be loaded except model. See `python run_openai.py -h` for more info.
+
+## Additional Notes
 
 * If an answer cannot be extracted from the model's response, the script will randomly assign an answer. It's the same way as the original script.
 * The total score represents the number of correct answers out of the total number of attempts. This is the score from the original script.
