@@ -293,9 +293,11 @@ def final_report():
 	for file in os.listdir(output_dir):
 		if "summary.json" in file:
 			res = json.load(open(os.path.join(output_dir, file)))
-			total_corr += res["total"]["corr"]
-			total_wrong += res["total"]["wrong"]
-			scores.append(total_corr/(total_corr+total_wrong))
+			cat_corr = res["total"]["corr"]
+			total_corr += cat_corr
+			cat_wrong = res["total"]["wrong"]
+			total_wrong += cat_wrong
+			scores.append(cat_corr/(cat_corr+cat_wrong))
 			if "random" in res:
 				random_corr += res["random"]["corr"]
 				random_wrong += res["random"]["wrong"]
