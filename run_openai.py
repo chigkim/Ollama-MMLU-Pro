@@ -35,7 +35,7 @@ parser.add_argument(
 	"--parallel", type=int, help="Number of parallel requests"
 )
 parser.add_argument(
-	"--verbosity", type=int, help="Verbosity level 0-3"
+	"--verbosity", type=int, help="Verbosity level 0-2"
 )
 parser.add_argument(
 	"--log_prompt", help="Writes exact prompt and response into log.txt", action="store_true"
@@ -125,7 +125,7 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
-		if config["log"]["verbosity"] >= 2:
+		if config["log"]["verbosity"] >= 1:
 			print("extraction failed")
 		return None
 
@@ -138,7 +138,7 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 			q_id == each["question_id"]
 			and single_question["question"] == each["question"]
 		):
-			if config["log"]["verbosity"] >= 2:
+			if config["log"]["verbosity"] >= 1:
 				print("already exists, skipping.")
 			return None, None, None, exist
 	exist = False
@@ -237,7 +237,7 @@ def evaluate(subjects):
 					each["response"] = response
 					each["pred"] = pred
 					res.append(each)
-					if config["log"]["verbosity"] >= 3:
+					if config["log"]["verbosity"] >= 2:
 						log_json = {
 							"id": each["question_id"],
 							"question": each["question"],
@@ -254,12 +254,7 @@ def evaluate(subjects):
 					else:
 						category_record[category]["wrong"] += 1
 					save_res(res, output_res_path, lock)
-					if config["log"]["verbosity"] >= 1:
-						save_summary(
-							category_record, output_summary_path, lock, report=True
-						)
-					else:
-						save_summary(category_record, output_summary_path, lock)
+					save_summary(category_record, output_summary_path, lock)
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
 		hours, minutes, seconds = elapsed(start)

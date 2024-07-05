@@ -16,7 +16,7 @@ categories = ["business", "law", "psychology", "biology", "chemistry", "history"
 parallel = 1
 
 [log]
-# Verbosity between 0-3
+# Verbosity between 0-2
 verbosity = 0
 # If true, logs exact prompt sent to the model in the test result files.
 log_prompt = false
