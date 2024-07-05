@@ -262,11 +262,11 @@ def evaluate(subjects):
 						save_summary(category_record, output_summary_path, lock)
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
-		save_summary(category_record, output_summary_path, lock, report=True)
 		hours, minutes, seconds = elapsed(start)
 		print(
 			f"Finished testing {subject} in {hours} hours, {minutes} minutes, {seconds} seconds."
 		)
+		save_summary(category_record, output_summary_path, lock, report=True)
 
 
 def save_res(res, output_res_path, lock):
@@ -289,7 +289,7 @@ def print_score(label, corr, wrong):
 	total = corr+wrong
 	acc = corr/total*100
 	print(
-		f"{label}, Correct: {corr}/{total}, Score: {acc:.2f}%"
+		f"{label}, {corr}/{total}, {acc:.2f}%"
 	)
 
 
@@ -306,12 +306,14 @@ def save_summary(category_record, output_summary_path, lock, report=False):
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
 	if report:
-		print_score("Category Total", total_corr, total_wrong)
+		print(f"Result for {list(category_record.keys())[0]}:")
+		print_score("Total", total_corr, total_wrong)
 		if "random" in category_record:
 			random_corr = category_record["random"]["corr"]
 			random_wrong = category_record["random"]["wrong"]
-			print_score("Category Random", random_corr, random_wrong)
-			print_score("Category Random Subtracted", total_corr-random_corr, total_wrong-random_wrong)
+			print_score("Random Guess Attempts", random_corr+random_wrong, total_corr+total_wrong-random_corr-random_wrong)
+			print_score("Correct Random Guesses", random_corr, random_wrong)
+			print_score("Adjusted Score Without Random Guesses", total_corr-random_corr, total_wrong-random_wrong)
 	with lock:
 		with open(output_summary_path, "w") as fo:
 			fo.write(json.dumps(category_record, indent="\t"))
@@ -340,10 +342,12 @@ def final_report():
 			if "random" in res:
 				random_corr += res["random"]["corr"]
 				random_wrong += res["random"]["wrong"]
-	print_score("Combined Total", total_corr, total_wrong)
+	print("Combined Result:")
+	print_score("Total", total_corr, total_wrong)
 	if random_corr and random_wrong:
-		print_score("Combined Random", random_corr, random_wrong)
-		print_score("Combined  Random Subtracted", total_corr-random_corr, total_wrong-random_wrong)
+		print_score("Random Guess Attempts", random_corr+random_wrong, total_corr+total_wrong-random_corr-random_wrong)
+		print_score("Correct Random Guesses", random_corr, random_wrong)
+		print_score("Adjusted Score Without Random Guesses", total_corr-random_corr, total_wrong-random_wrong)
 	scores.append(total_corr/(total_corr+total_wrong))
 	scores = [f"{score*100:.2f}" for score in scores]
 	table += "| "+" | ".join(scores)+" |"
