@@ -12,7 +12,7 @@ max_tokens = 4096
 system_prompt = "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
 
 [test]
-category = ["business", "law", "psychology", "biology", "chemistry", "history", "other", "health", "economics", "math", "physics", "computer science", "philosophy", "engineering"]
+categories = ["business", "law", "psychology", "biology", "chemistry", "history", "other", "health", "economics", "math", "physics", "computer science", "philosophy", "engineering"]
 parallel = 1
 
 [log]

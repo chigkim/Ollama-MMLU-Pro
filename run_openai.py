@@ -322,7 +322,7 @@ def elapsed(start):
 if __name__ == "__main__":
 	output_dir = "eval_results/" + re.sub(r"\W", "-", config["server"]["model"])
 	os.makedirs(output_dir, exist_ok=True)
-	assigned_subject = config["test"]["category"]
+	assigned_subject = config["test"]["categories"]
 	start = time.time()
 	evaluate(assigned_subject)
 	final_report()
