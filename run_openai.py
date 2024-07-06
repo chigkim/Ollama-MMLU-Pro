@@ -13,32 +13,36 @@ import codecs
 import tomllib
 import argparse
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(
+	prog="python3 run_openai.py",
+	description="Run MMLU Pro Benchmark for  a local LLM  via  OpenAI Compatible API.",
+	epilog="Specify  options above  to override  one or more settings from config.",
+)
 parser.add_argument(
-	"-c", "--config",
+	"-c",
+	"--config",
 	help="Configuration file. Default=config.toml",
 	default="config.toml",
 )
 parser.add_argument(
+	"-u",
 	"--url",
 	help="server url",
 )
-parser.add_argument("--api", help="api key")
-parser.add_argument("--model", help="Model name")
+parser.add_argument("-a", "--api", help="api key")
+parser.add_argument("-m", "--model", help="Model name")
 parser.add_argument(
 	"--timeout",
 	type=float,
 	help="Request timeout in seconds",
 )
 parser.add_argument("--category", type=str)
+parser.add_argument("-p", "--parallel", type=int, help="Number of parallel requests")
+parser.add_argument("-v", "--verbosity", type=int, help="Verbosity level 0-2")
 parser.add_argument(
-	"--parallel", type=int, help="Number of parallel requests"
-)
-parser.add_argument(
-	"--verbosity", type=int, help="Verbosity level 0-2"
-)
-parser.add_argument(
-	"--log_prompt", help="Writes exact prompt and response into log.txt", action="store_true"
+	"--log_prompt",
+	help="Writes exact prompt and response into log.txt",
+	action="store_true",
 )
 args = parser.parse_args()
 config = tomllib.load(open(args.config, "rb"))
@@ -59,7 +63,11 @@ if args.verbosity:
 if args.log_prompt:
 	config["log"]["log_prompt"] = args.log_prompt
 print(config)
-client = OpenAI(base_url=config["server"]["url"], api_key=config["server"]["api_key"], timeout=config["server"]["timeout"])
+client = OpenAI(
+	base_url=config["server"]["url"],
+	api_key=config["server"]["api_key"],
+	timeout=config["server"]["timeout"],
+)
 
 
 def get_completion(prompt):
@@ -278,14 +286,13 @@ def save_res(res, output_res_path, lock):
 		with open(output_res_path, "w") as fo:
 			fo.write(json.dumps(res, indent="\t"))
 
+
 def print_score(label, corr, wrong):
 	corr = int(corr)
 	wrong = int(wrong)
-	total = corr+wrong
-	acc = corr/total*100
-	print(
-		f"{label}, {corr}/{total}, {acc:.2f}%"
-	)
+	total = corr + wrong
+	acc = corr / total * 100
+	print(f"{label}, {corr}/{total}, {acc:.2f}%")
 
 
 def save_summary(category_record, output_summary_path, lock, report=False):
@@ -301,14 +308,21 @@ def save_summary(category_record, output_summary_path, lock, report=False):
 	acc = total_corr / (total_corr + total_wrong)
 	category_record["total"] = {"corr": total_corr, "wrong": total_wrong, "acc": acc}
 	if report:
-		print(f"Result for {list(category_record.keys())[0]}:")
 		print_score("Total", total_corr, total_wrong)
 		if "random" in category_record:
 			random_corr = category_record["random"]["corr"]
 			random_wrong = category_record["random"]["wrong"]
-			print_score("Random Guess Attempts", random_corr+random_wrong, total_corr+total_wrong-random_corr-random_wrong)
+			print_score(
+				"Random Guess Attempts",
+				random_corr + random_wrong,
+				total_corr + total_wrong - random_corr - random_wrong,
+			)
 			print_score("Correct Random Guesses", random_corr, random_wrong)
-			print_score("Adjusted Score Without Random Guesses", total_corr-random_corr, total_wrong-random_wrong)
+			print_score(
+				"Adjusted Score Without Random Guesses",
+				total_corr - random_corr,
+				total_wrong - random_wrong,
+			)
 	with lock:
 		with open(output_summary_path, "w") as fo:
 			fo.write(json.dumps(category_record, indent="\t"))
@@ -320,32 +334,40 @@ def final_report():
 	random_corr = 0.0
 	random_wrong = 0.0
 	files = os.listdir(output_dir)
-	files.append("total_summary.json")
-	names  = [file.replace("_summary.json", "") for file in files if "summary.json" in file]
-	table = "| "+" | ".join(names)+" |\n"
+	files = [file for file in files if "summary.json" in file]
+	files.sort()
+	names = [file.replace("_summary.json", "") for file in files]
+	names.append("total")
+	table = "| " + " | ".join(names) + " |\n"
 	separators = [re.sub(r".", "-", name) for name in names]
-	table += "| "+" | ".join(separators)+" |\n"
+	table += "| " + " | ".join(separators) + " |\n"
 	scores = []
-	for file in os.listdir(output_dir):
-		if "summary.json" in file:
-			res = json.load(open(os.path.join(output_dir, file)))
-			cat_corr = res["total"]["corr"]
-			total_corr += cat_corr
-			cat_wrong = res["total"]["wrong"]
-			total_wrong += cat_wrong
-			scores.append(cat_corr/(cat_corr+cat_wrong))
-			if "random" in res:
-				random_corr += res["random"]["corr"]
-				random_wrong += res["random"]["wrong"]
-	print("Combined Result:")
+	for file in files:
+		res = json.load(open(os.path.join(output_dir, file)))
+		cat_corr = res["total"]["corr"]
+		total_corr += cat_corr
+		cat_wrong = res["total"]["wrong"]
+		total_wrong += cat_wrong
+		scores.append(cat_corr / (cat_corr + cat_wrong))
+		if "random" in res:
+			random_corr += res["random"]["corr"]
+			random_wrong += res["random"]["wrong"]
 	print_score("Total", total_corr, total_wrong)
 	if random_corr and random_wrong:
-		print_score("Random Guess Attempts", random_corr+random_wrong, total_corr+total_wrong-random_corr-random_wrong)
+		print_score(
+			"Random Guess Attempts",
+			random_corr + random_wrong,
+			total_corr + total_wrong - random_corr - random_wrong,
+		)
 		print_score("Correct Random Guesses", random_corr, random_wrong)
-		print_score("Adjusted Score Without Random Guesses", total_corr-random_corr, total_wrong-random_wrong)
-	scores.append(total_corr/(total_corr+total_wrong))
+		print_score(
+			"Adjusted Score Without Random Guesses",
+			total_corr - random_corr,
+			total_wrong - random_wrong,
+		)
+	scores.append(total_corr / (total_corr + total_wrong))
 	scores = [f"{score*100:.2f}" for score in scores]
-	table += "| "+" | ".join(scores)+" |"
+	table += "| " + " | ".join(scores) + " |"
 	print("Markdown Table:")
 	print(table)
 
@@ -370,4 +392,3 @@ if __name__ == "__main__":
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
 	final_report()
-	
