@@ -217,6 +217,11 @@ def evaluate(subjects):
 	for subject in subjects:
 		start = time.time()
 		print(f"Testing {subject}...")
+		config["inference"]["system_prompt"] = config["inference"][
+			"system_prompt"
+		].replace(
+			"{subject}", subject
+		)
 		test_data = test_df[subject]
 		output_res_path = os.path.join(output_dir, subject + "_result.json")
 		output_summary_path = os.path.join(output_dir, subject + "_summary.json")
@@ -328,22 +333,18 @@ def save_summary(category_record, output_summary_path, lock, report=False):
 			fo.write(json.dumps(category_record, indent="\t"))
 
 
-def final_report():
+def final_report(assigned_subjects):
 	total_corr = 0.0
 	total_wrong = 0.0
 	random_corr = 0.0
 	random_wrong = 0.0
-	files = os.listdir(output_dir)
-	files = [file for file in files if "summary.json" in file]
-	files.sort()
-	names = [file.replace("_summary.json", "") for file in files]
-	names.append("total")
+	names = assigned_subjects + ["total"]
 	table = "| " + " | ".join(names) + " |\n"
 	separators = [re.sub(r".", "-", name) for name in names]
 	table += "| " + " | ".join(separators) + " |\n"
 	scores = []
-	for file in files:
-		res = json.load(open(os.path.join(output_dir, file)))
+	for file in assigned_subjects:
+		res = json.load(open(os.path.join(output_dir, file + "_summary.json")))
 		cat_corr = res["total"]["corr"]
 		total_corr += cat_corr
 		cat_wrong = res["total"]["wrong"]
@@ -383,12 +384,11 @@ def elapsed(start):
 if __name__ == "__main__":
 	output_dir = "eval_results/" + re.sub(r"\W", "-", config["server"]["model"])
 	os.makedirs(output_dir, exist_ok=True)
-	assigned_subject = config["test"]["categories"]
-	assigned_subject.sort()
+	assigned_subjects = config["test"]["categories"]
 	start = time.time()
-	evaluate(assigned_subject)
+	evaluate(assigned_subjects)
 	hours, minutes, seconds = elapsed(start)
 	print(
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
-	final_report()
+	final_report(assigned_subjects)
