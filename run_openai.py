@@ -1,13 +1,13 @@
 import os
 import re
 import json
+import time
 import random
 from tqdm import tqdm
 from openai import OpenAI
 from datasets import load_dataset
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-import time
 from datetime import timedelta
 import codecs
 import tomllib
@@ -62,12 +62,19 @@ if args.verbosity:
 	config["log"]["verbosity"] = args.verbosity
 if args.log_prompt:
 	config["log"]["log_prompt"] = args.log_prompt
+
 print(config)
 client = OpenAI(
 	base_url=config["server"]["url"],
 	api_key=config["server"]["api_key"],
 	timeout=config["server"]["timeout"],
 )
+
+
+def log(message):
+	print(message)
+	with codecs.open(log_path, "a", "utf-8") as file:
+		file.write(message + "\n")
 
 
 def get_completion(prompt):
@@ -271,7 +278,7 @@ def evaluate(subjects):
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
 		hours, minutes, seconds = elapsed(start)
-		print(
+		log(
 			f"Finished testing {subject} in {hours} hours, {minutes} minutes, {seconds} seconds."
 		)
 		save_summary(category_record, output_summary_path, lock, report=True)
@@ -297,7 +304,7 @@ def print_score(label, corr, wrong):
 	wrong = int(wrong)
 	total = corr + wrong
 	acc = corr / total * 100
-	print(f"{label}, {corr}/{total}, {acc:.2f}%")
+	log(f"{label}, {corr}/{total}, {acc:.2f}%")
 
 
 def save_summary(category_record, output_summary_path, lock, report=False):
@@ -369,8 +376,8 @@ def final_report(assigned_subjects):
 	scores.append(total_corr / (total_corr + total_wrong))
 	scores = [f"{score*100:.2f}" for score in scores]
 	table += "| " + " | ".join(scores) + " |"
-	print("Markdown Table:")
-	print(table)
+	log("Markdown Table:")
+	log(table)
 
 
 def elapsed(start):
@@ -384,11 +391,17 @@ def elapsed(start):
 if __name__ == "__main__":
 	output_dir = "eval_results/" + re.sub(r"\W", "-", config["server"]["model"])
 	os.makedirs(output_dir, exist_ok=True)
+	log_path = os.path.join(output_dir, "report.txt")
+	try:
+		os.remove(log_path)
+	except:
+		pass
 	assigned_subjects = config["test"]["categories"]
 	start = time.time()
 	evaluate(assigned_subjects)
 	hours, minutes, seconds = elapsed(start)
-	print(
+	log(
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
 	final_report(assigned_subjects)
+	print("Final Report:", log_path)
