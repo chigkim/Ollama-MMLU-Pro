@@ -4,7 +4,11 @@ This is a modified version of run_gpt4o.py from [TIGER-AI-Lab/MMLU-Pro](https://
 
 <a href="https://colab.research.google.com/github/chigkim/Ollama-MMLU-Pro/blob/main/Ollama_MMLU_Pro.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 
-I kept the  testing method exactly the same as the original script, adding only a few features to simplify running the test and displaying the results.
+I kept the  testing and scoring  method exactly the same as the original script, adding only a few features to simplify running the test and displaying the results. To see    the exact changes, compare between mmlu-pro branch against main with git diff:
+
+```bash
+git diff mmlu-pro..main -- run_openai.py
+```
 
 ## Usage
 

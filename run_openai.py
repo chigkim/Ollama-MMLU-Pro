@@ -140,8 +140,17 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
+		return extract_again(text)
+
+
+def extract_again(text):
+	pattern = r".*[aA]nswer:\s*\(?([A-J])\)?"
+	match = re.search(pattern, text)
+	if match:
+		return match.group(1)
+	else:
 		if config["log"]["verbosity"] >= 1:
-			print("extraction failed")
+			print("extraction failed:\n", text)
 		return None
 
 
@@ -221,12 +230,11 @@ def evaluate(subjects):
 		subjects = list(test_df.keys())
 	print("assigned subjects", subjects)
 	lock = threading.Lock()
+	system_prompt = config["inference"]["system_prompt"]
 	for subject in subjects:
 		start = time.time()
 		print(f"Testing {subject}...")
-		config["inference"]["system_prompt"] = config["inference"][
-			"system_prompt"
-		].replace(
+		config["inference"]["system_prompt"] = system_prompt.replace(
 			"{subject}", subject
 		)
 		test_data = test_df[subject]
