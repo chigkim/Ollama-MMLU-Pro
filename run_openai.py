@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from datetime import timedelta
 import codecs
-import tomllib
+import toml
 import argparse
 
 parser = argparse.ArgumentParser(
@@ -45,7 +45,7 @@ parser.add_argument(
 	action="store_true",
 )
 args = parser.parse_args()
-config = tomllib.load(open(args.config, "rb"))
+config = toml.load(open(args.config))
 if args.url:
 	config["server"]["url"] = args.url
 if args.api:
