@@ -8,10 +8,10 @@ timeout = 600.0
 # Ssettings   below are from evaluate_from_local.py for VLLM  on TIGER-AI-Lab/MMLU-Pro
 temperature = 0.0
 top_p = 1.0 # not specified but  default for VLLM
-max_tokens = 4096
+max_tokens = 2048
 # The variable {subject} will be replaced with appropriate value in  runtime.
 system_prompt = "The following are multiple choice questions (with answers) about {subject}. Think step by step and then finish your answer with \"the answer is (X)\" where X is the correct letter choice."
-# "single_chat" inserts all the COT examples and question into a single message. Default  style for GPT-4O script, but it raises a lot of format issues especially for small models.
+# "single_chat" inserts all the COT examples and question into a single message. Default  style for GPT-4O script, but raises a lot of format issues especially for small models.
 # "multi_chat" inserts COT examples into multi-turn messages. Use for instruct/chat models.
 # "no_chat" uses v1/completion api. Use for non-instruct/chat model.
 style = "multi_chat"
@@ -24,4 +24,4 @@ parallel = 1
 # Verbosity between 0-2
 verbosity = 0
 # If true, logs exact prompt sent to the model in the test result files.
-log_prompt = false
+log_prompt = true
