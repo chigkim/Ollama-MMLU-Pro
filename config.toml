@@ -5,13 +5,12 @@ model = "llama3"
 timeout = 600.0
 
 [inference]
-# Ssettings   below are from run_gpt4o.py on TIGER-AI-Lab/MMLU-Pro
-temperature = 0.1
-top_p = 1.0
+# Ssettings   below are from evaluate_from_local.py for VLLM  on TIGER-AI-Lab/MMLU-Pro
+temperature = 0.0
+top_p = 1.0 # not specified but  default for VLLM
 max_tokens = 4096
-system_prompt = "You are an knowledge expert, you are supposed to answer the multi-choice question to derive your final answer as `The answer is ...`."
-# System prompt from the MMLU Pro paper
-# system_prompt = "The following are multiple-choice questions (with answers) about {subject}. Think step by step and then finish your answer with \"The answer is (X)\" where X is the correct letter choice."
+# The variable {subject} will be replaced with appropriate value in  runtime.
+system_prompt = "The following are multiple choice questions (with answers) about {subject}. Think step by step and then finish your answer with \"the answer is (X)\" where X is the correct letter choice."
 
 [test]
 categories = ["business", "law", "psychology", "biology", "chemistry", "history", "other", "health", "economics", "math", "physics", "computer science", "philosophy", "engineering"]

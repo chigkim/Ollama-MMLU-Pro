@@ -1,17 +1,19 @@
 import os
 import re
 import json
+import time
 import random
 from tqdm import tqdm
 from openai import OpenAI
 from datasets import load_dataset
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-import time
 from datetime import timedelta
 import codecs
-import tomllib
+import toml
 import argparse
+import queue
+import numpy as np
 
 parser = argparse.ArgumentParser(
 	prog="python3 run_openai.py",
@@ -45,7 +47,7 @@ parser.add_argument(
 	action="store_true",
 )
 args = parser.parse_args()
-config = tomllib.load(open(args.config, "rb"))
+config = toml.load(open(args.config))
 if args.url:
 	config["server"]["url"] = args.url
 if args.api:
@@ -62,12 +64,19 @@ if args.verbosity:
 	config["log"]["verbosity"] = args.verbosity
 if args.log_prompt:
 	config["log"]["log_prompt"] = args.log_prompt
+
 print(config)
 client = OpenAI(
 	base_url=config["server"]["url"],
 	api_key=config["server"]["api_key"],
 	timeout=config["server"]["timeout"],
 )
+
+
+def log(message):
+	print(message)
+	with codecs.open(log_path, "a", "utf-8") as file:
+		file.write(message + "\n")
 
 
 def get_completion(prompt):
@@ -82,6 +91,10 @@ def get_completion(prompt):
 		stop=["Question:"],
 		timeout=config["server"]["timeout"],
 	)
+	try:
+		usage_q.put((response.usage.prompt_tokens, response.usage.completion_tokens))
+	except:
+		pass
 	return response.choices[0].message.content.strip()
 
 
@@ -133,8 +146,17 @@ def extract_answer(text):
 	if match:
 		return match.group(1)
 	else:
+		return extract_again(text)
+
+
+def extract_again(text):
+	pattern = r".*[aA]nswer:\s*\(?([A-J])\)?"
+	match = re.search(pattern, text)
+	if match:
+		return match.group(1)
+	else:
 		if config["log"]["verbosity"] >= 1:
-			print("extraction failed")
+			print("extraction failed:\n", text)
 		return None
 
 
@@ -214,12 +236,11 @@ def evaluate(subjects):
 		subjects = list(test_df.keys())
 	print("assigned subjects", subjects)
 	lock = threading.Lock()
+	system_prompt = config["inference"]["system_prompt"]
 	for subject in subjects:
 		start = time.time()
 		print(f"Testing {subject}...")
-		config["inference"]["system_prompt"] = config["inference"][
-			"system_prompt"
-		].replace(
+		config["inference"]["system_prompt"] = system_prompt.replace(
 			"{subject}", subject
 		)
 		test_data = test_df[subject]
@@ -271,7 +292,7 @@ def evaluate(subjects):
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
 		hours, minutes, seconds = elapsed(start)
-		print(
+		log(
 			f"Finished testing {subject} in {hours} hours, {minutes} minutes, {seconds} seconds."
 		)
 		save_summary(category_record, output_summary_path, lock, report=True)
@@ -297,7 +318,7 @@ def print_score(label, corr, wrong):
 	wrong = int(wrong)
 	total = corr + wrong
 	acc = corr / total * 100
-	print(f"{label}, {corr}/{total}, {acc:.2f}%")
+	log(f"{label}, {corr}/{total}, {acc:.2f}%")
 
 
 def save_summary(category_record, output_summary_path, lock, report=False):
@@ -369,8 +390,8 @@ def final_report(assigned_subjects):
 	scores.append(total_corr / (total_corr + total_wrong))
 	scores = [f"{score*100:.2f}" for score in scores]
 	table += "| " + " | ".join(scores) + " |"
-	print("Markdown Table:")
-	print(table)
+	log("Markdown Table:")
+	log(table)
 
 
 def elapsed(start):
@@ -381,14 +402,40 @@ def elapsed(start):
 	return hours, minutes, seconds
 
 
+def token_report():
+	ptoks = []
+	ctoks = []
+	while not usage_q.empty():
+		usage = usage_q.get()
+		ptoks.append(usage[0])
+		ctoks.append(usage[1])
+	if ptoks and ctoks:
+		ptoks = np.array(ptoks)
+		ctoks = np.array(ctoks)
+		log(
+			f"Prompt tokens: min {ptoks.min()}, average {ptoks.mean():.0f}, max {ptoks.max()}, total {ptoks.sum()}"
+		)
+		log(
+			f"Completion tokens: min {ctoks.min()}, average {ctoks.mean():.0f}, max {ctoks.max()}, total {ctoks.sum()}"
+		)
+
+
 if __name__ == "__main__":
+	usage_q = queue.Queue()
 	output_dir = "eval_results/" + re.sub(r"\W", "-", config["server"]["model"])
 	os.makedirs(output_dir, exist_ok=True)
+	log_path = os.path.join(output_dir, "report.txt")
+	try:
+		os.remove(log_path)
+	except:
+		pass
 	assigned_subjects = config["test"]["categories"]
 	start = time.time()
 	evaluate(assigned_subjects)
 	hours, minutes, seconds = elapsed(start)
-	print(
+	log(
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
 	final_report(assigned_subjects)
+	token_report()
+	print("Report saved to:", log_path)
