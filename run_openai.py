@@ -417,7 +417,7 @@ def final_report(assigned_subjects):
 	total_wrong = 0.0
 	random_corr = 0.0
 	random_wrong = 0.0
-	names = assigned_subjects + ["total"]
+	names = ["overall"] + assigned_subjects
 	table = "| " + " | ".join(names) + " |\n"
 	separators = [re.sub(r".", "-", name) for name in names]
 	table += "| " + " | ".join(separators) + " |\n"
@@ -445,9 +445,10 @@ def final_report(assigned_subjects):
 			total_corr - random_corr,
 			total_wrong - random_wrong,
 		)
-	scores.append(total_corr / (total_corr + total_wrong))
+	scores.insert(0, total_corr / (total_corr + total_wrong))
 	scores = [f"{score*100:.2f}" for score in scores]
 	table += "| " + " | ".join(scores) + " |"
+	token_report()
 	log("Markdown Table:")
 	log(table)
 
@@ -468,13 +469,15 @@ def token_report():
 		ptoks.append(usage[0])
 		ctoks.append(usage[1])
 	if ptoks and ctoks:
+		log("Token Usage:")
+		duration = end - start
 		ptoks = np.array(ptoks)
 		ctoks = np.array(ctoks)
 		log(
-			f"Prompt tokens: min {ptoks.min()}, average {ptoks.mean():.0f}, max {ptoks.max()}, total {ptoks.sum()}"
+			f"Prompt tokens: min {ptoks.min()}, average {ptoks.mean():.0f}, max {ptoks.max()}, total {ptoks.sum()}, tk/s {ptoks.sum()/duration:.2f}"
 		)
 		log(
-			f"Completion tokens: min {ctoks.min()}, average {ctoks.mean():.0f}, max {ctoks.max()}, total {ctoks.sum()}"
+			f"Completion tokens: min {ctoks.min()}, average {ctoks.mean():.0f}, max {ctoks.max()}, total {ctoks.sum()}, tk/s {ctoks.sum()/duration:.2f}"
 		)
 
 
@@ -490,10 +493,10 @@ if __name__ == "__main__":
 	assigned_subjects = config["test"]["categories"]
 	start = time.time()
 	evaluate(assigned_subjects)
+	end = time.time()
 	hours, minutes, seconds = elapsed(start)
 	log(
 		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
 	)
 	final_report(assigned_subjects)
-	token_report()
 	print("Report saved to:", log_path)

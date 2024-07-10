@@ -17,7 +17,7 @@ system_prompt = "The following are multiple choice questions (with answers) abou
 style = "multi_chat"
 
 [test]
-categories = ["business", "law", "psychology", "biology", "chemistry", "history", "other", "health", "economics", "math", "physics", "computer science", "philosophy", "engineering"]
+categories = ['biology', 'business', 'chemistry', 'computer science', 'economics', 'engineering', 'health', 'history', 'law', 'math', 'philosophy', 'physics', 'psychology', 'other']
 parallel = 1
 
 [log]
