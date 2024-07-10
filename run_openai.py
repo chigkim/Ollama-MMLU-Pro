@@ -79,10 +79,10 @@ def log(message):
 		file.write(message + "\n")
 
 
-def get_completion(prompt):
+def get_chat_completion(messages):
 	response = client.chat.completions.create(
 		model=config["server"]["model"],
-		messages=prompt,
+		messages=messages,
 		temperature=config["inference"]["temperature"],
 		max_tokens=config["inference"]["max_tokens"],
 		top_p=config["inference"]["top_p"],
@@ -96,6 +96,25 @@ def get_completion(prompt):
 	except:
 		pass
 	return response.choices[0].message.content.strip()
+
+
+def get_completion(prompt):
+	response = client.completions.create(
+		model=config["server"]["model"],
+		prompt=prompt,
+		temperature=config["inference"]["temperature"],
+		max_tokens=config["inference"]["max_tokens"],
+		top_p=config["inference"]["top_p"],
+		frequency_penalty=0,
+		presence_penalty=0,
+		stop=["Question:"],
+		timeout=config["server"]["timeout"],
+	)
+	try:
+		usage_q.put((response.usage.prompt_tokens, response.usage.completion_tokens))
+	except:
+		pass
+	return response.choices[0].text.strip()
 
 
 def load_mmlu_pro():
@@ -133,11 +152,53 @@ def format_example(question, options, cot_content=""):
 	choice_map = "ABCDEFGHIJ"
 	for i, opt in enumerate(options):
 		example += "{}. {}\n".format(choice_map[i], opt)
-	if cot_content == "":
-		example += "Answer: "
-	else:
-		example += "Answer: " + cot_content + "\n\n"
-	return example
+	return example.strip(), cot_content.strip()
+
+
+def multi_chat_prompt(cot_examples, question, options):
+	messages = [
+		{
+			"role": "system",
+			"content": config["inference"]["system_prompt"],
+		},
+	]
+	for each in cot_examples:
+		example, cot_content = format_example(
+			each["question"], each["options"], each["cot_content"]
+		)
+		messages.append({"role": "user", "content": example})
+		messages.append({"role": "assistant", "content": "Answer: " + cot_content})
+	example, cot_content = format_example(question, options)
+	messages.append({"role": "user", "content": example})
+	return messages
+
+
+def single_chat_prompt(cot_examples, question, options):
+	messages = [
+		{
+			"role": "system",
+			"content": config["inference"]["system_prompt"],
+		},
+	]
+	prompt = no_chat_prompt(cot_examples, question, options, no_system=True)
+	messages.append({"role": "user", "content": prompt})
+	return messages
+
+
+def no_chat_prompt(cot_examples, question, options, no_system=False):
+	prompt = config["inference"]["system_prompt"] + "\n\n"
+	if no_system:
+		prompt = ""
+	for each in cot_examples:
+		example, cot_content = format_example(
+			each["question"], each["options"], each["cot_content"]
+		)
+		prompt += example + "\n"
+		prompt += "Answer: " + cot_content + "\n\n"
+	example, cot_content = format_example(question, options)
+	prompt += example + "\n"
+	prompt += "Answer: " + cot_content
+	return prompt
 
 
 def extract_answer(text):
@@ -176,19 +237,16 @@ def run_single_question(single_question, cot_examples_dict, exist_result):
 	cot_examples = cot_examples_dict[category]
 	question = single_question["question"]
 	options = single_question["options"]
-	prompt = ""
-	for each in cot_examples:
-		prompt += format_example(each["question"], each["options"], each["cot_content"])
-	prompt += format_example(question, options).strip()
-	prompt = [
-		{
-			"role": "system",
-			"content": config["inference"]["system_prompt"],
-		},
-		{"role": "user", "content": prompt},
-	]
 	try:
-		response = get_completion(prompt)
+		if config["inference"]["style"] == "single_chat":
+			prompt = single_chat_prompt(cot_examples, question, options)
+			response = get_chat_completion(prompt)
+		elif config["inference"]["style"] == "multi_chat":
+			prompt = multi_chat_prompt(cot_examples, question, options)
+			response = get_chat_completion(prompt)
+		elif config["inference"]["style"] == "no_chat":
+			prompt = no_chat_prompt(cot_examples, question, options)
+			response = get_completion(prompt)
 	except Exception as e:
 		print("error", e)
 		return None, None, None, exist
