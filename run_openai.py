@@ -372,11 +372,14 @@ def save_res(res, output_res_path, lock):
 
 
 def print_score(label, corr, wrong):
-	corr = int(corr)
-	wrong = int(wrong)
-	total = corr + wrong
-	acc = corr / total * 100
-	log(f"{label}, {corr}/{total}, {acc:.2f}%")
+	try:
+		corr = int(corr)
+		wrong = int(wrong)
+		total = corr + wrong
+		acc = corr / total * 100
+		log(f"{label}, {corr}/{total}, {acc:.2f}%")
+	except Exception as e:
+		log(f"{label}, {e} error")
 
 
 def save_summary(category_record, output_summary_path, lock, report=False):
