@@ -216,8 +216,17 @@ def extract_again(text):
 	if match:
 		return match.group(1)
 	else:
+		return extract_final(text)
+
+
+def extract_final(text):
+	pattern = r"\b[A-J]\b(?!.*\b[A-J]\b)"
+	match = re.search(pattern, text, re.DOTALL)
+	if match:
+		return match[0]
+	else:
 		if config["log"]["verbosity"] >= 1:
-			print("extraction failed:\n", text)
+			print("Extraction failed:\n", text)
 		return None
 
 
