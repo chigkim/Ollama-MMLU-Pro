@@ -321,7 +321,7 @@ def evaluate(subjects):
 				for each in test_data
 			}
 			for future in tqdm(
-				as_completed(futures), total=len(futures), smoothing=0.0
+				as_completed(futures), total=len(futures), smoothing=0.0, ascii=True
 			):
 				each = futures[future]
 				label = each["answer"]
