@@ -114,7 +114,12 @@ def get_completion(prompt):
 		usage_q.put((response.usage.prompt_tokens, response.usage.completion_tokens))
 	except:
 		pass
-	return response.choices[0].text.strip()
+	if response.choices:
+		return response.choices[0].text.strip()
+	elif response.content:
+		return response.content.strip()
+	print("Can't get response.")
+	return None
 
 
 def load_mmlu_pro():
