@@ -8,12 +8,13 @@ from openai import OpenAI
 from datasets import load_dataset
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
-from datetime import timedelta
+from datetime import datetime, timedelta
 import codecs
 import toml
 import argparse
 import queue
 import numpy as np
+import copy
 
 parser = argparse.ArgumentParser(
 	prog="python3 run_openai.py",
@@ -46,6 +47,9 @@ parser.add_argument(
 	help="Writes exact prompt and response into log.txt",
 	action="store_true",
 )
+parser.add_argument(
+	"--comment", type=str, help="Comment to be included in the final report."
+)
 args = parser.parse_args()
 config = toml.load(open(args.config))
 if args.url:
@@ -64,8 +68,10 @@ if args.verbosity:
 	config["log"]["verbosity"] = args.verbosity
 if args.log_prompt:
 	config["log"]["log_prompt"] = args.log_prompt
+if args.comment:
+	config["comment"] = args.comment
 
-print(config)
+
 client = OpenAI(
 	base_url=config["server"]["url"],
 	api_key=config["server"]["api_key"],
@@ -507,6 +513,10 @@ if __name__ == "__main__":
 		os.remove(log_path)
 	except:
 		pass
+	config_copy = copy.deepcopy(config)
+	del config_copy["server"]["api_key"]
+	log(f"{datetime.now()}")
+	log(json.dumps(config_copy, indent="\t"))
 	assigned_subjects = config["test"]["categories"]
 	start = time.time()
 	evaluate(assigned_subjects)
