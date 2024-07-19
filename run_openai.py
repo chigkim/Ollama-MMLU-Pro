@@ -86,46 +86,58 @@ def log(message):
 
 
 def get_chat_completion(messages):
-	response = client.chat.completions.create(
-		model=config["server"]["model"],
-		messages=messages,
-		temperature=config["inference"]["temperature"],
-		max_tokens=config["inference"]["max_tokens"],
-		top_p=config["inference"]["top_p"],
-		frequency_penalty=0,
-		presence_penalty=0,
-		stop=["Question:"],
-		timeout=config["server"]["timeout"],
-	)
 	try:
-		usage_q.put((response.usage.prompt_tokens, response.usage.completion_tokens))
-	except:
-		pass
-	return response.choices[0].message.content.strip()
+		response = client.chat.completions.create(
+			model=config["server"]["model"],
+			messages=messages,
+			temperature=config["inference"]["temperature"],
+			max_tokens=config["inference"]["max_tokens"],
+			top_p=config["inference"]["top_p"],
+			frequency_penalty=0,
+			presence_penalty=0,
+			stop=["Question:"],
+			timeout=config["server"]["timeout"],
+		)
+		try:
+			usage_q.put(
+				(response.usage.prompt_tokens, response.usage.completion_tokens)
+			)
+		except:
+			pass
+		return response.choices[0].message.content.strip()
+	except Exception as e:
+		print("Resubmitting, Error: ", e)
+		return get_chat_completion(messages)
 
 
 def get_completion(prompt):
-	response = client.completions.create(
-		model=config["server"]["model"],
-		prompt=prompt,
-		temperature=config["inference"]["temperature"],
-		max_tokens=config["inference"]["max_tokens"],
-		top_p=config["inference"]["top_p"],
-		frequency_penalty=0,
-		presence_penalty=0,
-		stop=["Question:"],
-		timeout=config["server"]["timeout"],
-	)
 	try:
-		usage_q.put((response.usage.prompt_tokens, response.usage.completion_tokens))
-	except:
-		pass
-	if response.choices:
-		return response.choices[0].text.strip()
-	elif response.content:
-		return response.content.strip()
-	print("Can't get response.")
-	return None
+		response = client.completions.create(
+			model=config["server"]["model"],
+			prompt=prompt,
+			temperature=config["inference"]["temperature"],
+			max_tokens=config["inference"]["max_tokens"],
+			top_p=config["inference"]["top_p"],
+			frequency_penalty=0,
+			presence_penalty=0,
+			stop=["Question:"],
+			timeout=config["server"]["timeout"],
+		)
+		try:
+			usage_q.put(
+				(response.usage.prompt_tokens, response.usage.completion_tokens)
+			)
+		except:
+			pass
+		if response.choices:
+			return response.choices[0].text.strip()
+		elif response.content:
+			return response.content.strip()
+		print("Can't get response.")
+		return None
+	except Exception as e:
+		print("Resubmitting, Error: ", e)
+		return get_completion(prompt)
 
 
 def load_mmlu_pro():
@@ -515,6 +527,7 @@ if __name__ == "__main__":
 		pass
 	config_copy = copy.deepcopy(config)
 	del config_copy["server"]["api_key"]
+	del config_copy["test"]["categories"]
 	log(f"{datetime.now()}")
 	log(json.dumps(config_copy, indent="\t"))
 	assigned_subjects = config["test"]["categories"]
