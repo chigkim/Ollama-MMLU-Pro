@@ -107,6 +107,7 @@ def get_chat_completion(messages):
 		return response.choices[0].message.content.strip()
 	except Exception as e:
 		print("Resubmitting, Error: ", e)
+		time.sleep(3)
 		return get_chat_completion(messages)
 
 
@@ -137,6 +138,7 @@ def get_completion(prompt):
 		return None
 	except Exception as e:
 		print("Resubmitting, Error: ", e)
+		time.sleep(3)
 		return get_completion(prompt)
 
 
