@@ -383,10 +383,7 @@ def evaluate(subjects):
 					save_summary(category_record, output_summary_path, lock)
 					res, category_record = update_result(output_res_path, lock)
 		save_res(res, output_res_path, lock)
-		hours, minutes, seconds = elapsed(start)
-		log(
-			f"Finished testing {subject} in {hours} hours, {minutes} minutes, {seconds} seconds."
-		)
+		log(f"Finished testing {subject} in {elapsed(start)}.")
 		save_summary(category_record, output_summary_path, lock, report=True)
 
 
@@ -493,9 +490,19 @@ def final_report(assigned_subjects):
 def elapsed(start):
 	duration = time.time() - start
 	duration_td = timedelta(seconds=duration)
+	days = duration_td.days
 	hours, remainder = divmod(duration_td.seconds, 3600)
 	minutes, seconds = divmod(remainder, 60)
-	return hours, minutes, seconds
+	dur_str = ""
+	if days:
+		dur_str = f"{days} days "
+	if hours:
+		dur_str += f"{hours} hours "
+	if minutes:
+		dur_str += f"{minutes} minutes "
+	if seconds:
+		dur_str += f"{seconds} seconds"
+	return dur_str
 
 
 def token_report():
@@ -536,9 +543,6 @@ if __name__ == "__main__":
 	start = time.time()
 	evaluate(assigned_subjects)
 	end = time.time()
-	hours, minutes, seconds = elapsed(start)
-	log(
-		f"Finished the benchmark in {hours} hours, {minutes} minutes, {seconds} seconds."
-	)
+	log(f"Finished the benchmark in {elapsed(start)}.")
 	final_report(assigned_subjects)
 	print("Report saved to:", log_path)
