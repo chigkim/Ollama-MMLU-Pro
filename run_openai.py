@@ -156,6 +156,7 @@ def load_mmlu_pro():
 	val_df = preprocess(val_df, config["subset"])
 	return test_df, val_df
 
+
 def preprocess(input_ds, subset=None):
 	reorganized = {}
 	for question in input_ds:
@@ -163,8 +164,12 @@ def preprocess(input_ds, subset=None):
 			reorganized[question["category"]] = []
 		if subset and len(reorganized[question["category"]]) >= subset:
 			continue
-		filtered_question = copy.deepcopy(question) # ensure the original dataset isn't modified
-		filtered_question["options"] = [opt for opt in question["options"] if opt != "N/A"]
+		filtered_question = copy.deepcopy(
+			question
+		)  # ensure the original dataset isn't modified
+		filtered_question["options"] = [
+			opt for opt in question["options"] if opt != "N/A"
+		]
 		reorganized[question["category"]].append(filtered_question)
 	return reorganized
 
