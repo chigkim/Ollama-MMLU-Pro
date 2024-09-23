@@ -51,6 +51,9 @@ parser.add_argument(
 	"--subset", type=int, help="Only use the first N questions per category."
 )
 parser.add_argument(
+	"--subset_percent", type=float, help="Only use the first N percent of questions per category."
+)
+parser.add_argument(
 	"--comment", type=str, help="Comment to be included in the final report."
 )
 args = parser.parse_args()
@@ -72,9 +75,13 @@ if args.verbosity:
 if args.log_prompt:
 	config["log"]["log_prompt"] = args.log_prompt
 if args.subset:
-	config["subset"] = args.subset
-if not "subset" in config:
-	config["subset"] = None
+	config["test"]["subset"] = args.subset
+if not "subset" in config["test"]:
+	config["test"]["subset"] = None
+if args.subset_percent:
+	config["test"]["subset_percent"] = args.subset_percent
+if not "subset_percent" in config["test"]:
+	config["test"]["subset_percent"] = None
 if args.comment:
 	config["comment"] = args.comment
 
@@ -151,25 +158,22 @@ def get_completion(prompt):
 
 def load_mmlu_pro():
 	dataset = load_dataset("TIGER-Lab/MMLU-Pro")
-	test_df, val_df = dataset["test"], dataset["validation"]
-	test_df = preprocess(test_df, config["subset"])
-	val_df = preprocess(val_df, config["subset"])
+	test_df = preprocess(dataset["test"])
+	val_df = preprocess(dataset["validation"])
+	if config["test"]["subset_percent"]:
+		test_df = {x:y[:int(len(y)*config["test"]["subset_percent"]/100.0)] for x,y in test_df.items()}
+	if config["test"]["subset"]:
+		test_df = {x:y[:config["test"]["subset"]] for x,y in test_df.items()}
 	return test_df, val_df
 
 
-def preprocess(input_ds, subset=None):
+def preprocess(input_ds):
 	reorganized = {}
 	for question in input_ds:
 		if question["category"] not in reorganized:
 			reorganized[question["category"]] = []
-		if subset and len(reorganized[question["category"]]) >= subset:
-			continue
-		filtered_question = copy.deepcopy(
-			question
-		)  # ensure the original dataset isn't modified
-		filtered_question["options"] = [
-			opt for opt in question["options"] if opt != "N/A"
-		]
+		filtered_question = copy.deepcopy(question) # ensure the original dataset isn't modified
+		filtered_question["options"] = [opt for opt in question["options"] if opt != "N/A"]
 		reorganized[question["category"]].append(filtered_question)
 	return reorganized
 
