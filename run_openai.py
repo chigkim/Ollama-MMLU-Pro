@@ -40,6 +40,7 @@ parser.add_argument(
 	help="Request timeout in seconds",
 )
 parser.add_argument("--category", type=str)
+parser.add_argument("--subset", type=float, help="Fraction (0.4 for 40%) of items to keep per category.")
 parser.add_argument("-p", "--parallel", type=int, help="Number of parallel requests")
 parser.add_argument("-v", "--verbosity", type=int, help="Verbosity level 0-2")
 parser.add_argument(
@@ -62,6 +63,8 @@ if args.timeout:
 	config["server"]["timeout"] = args.timeout
 if args.category:
 	config["test"]["categories"] = [args.category]
+if args.subset:
+	config["test"]["subset"] = args.subset
 if args.parallel:
 	config["test"]["parallel"] = args.parallel
 if args.verbosity:
@@ -145,12 +148,14 @@ def get_completion(prompt):
 def load_mmlu_pro():
 	dataset = load_dataset("TIGER-Lab/MMLU-Pro")
 	test_df, val_df = dataset["test"], dataset["validation"]
-	test_df = preprocess(test_df)
+	test_df = preprocess(test_df, subset=config["test"]["subset"])
 	val_df = preprocess(val_df)
 	return test_df, val_df
 
 
-def preprocess(test_df):
+def preprocess(test_df, subset=1.0):
+	if not (0.0 <= subset <= 1.0):
+		raise ValueError("Subset must be a value between 0.0 and 1.0.")
 	res_df = []
 	for each in test_df:
 		options = []
@@ -165,6 +170,12 @@ def preprocess(test_df):
 		if each["category"] not in res:
 			res[each["category"]] = []
 		res[each["category"]].append(each)
+
+	for category in res:
+		items = res[category]
+		subset_size = max(1, int(len(items) * subset))
+		res[category] = items[:subset_size]
+
 	return res
 
 
