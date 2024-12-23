@@ -227,19 +227,18 @@ def no_chat_prompt(cot_examples, question, options, no_system=False):
 
 
 def extract_answer(text):
-	pattern = r"answer is \(?([ABCDEFGHIJ])\)?"
+	pattern = r"answer is \(?([A-J])\)?"
 	match = re.search(pattern, text)
 	if match:
-		return match.group(1)
+		return match[1]
 	else:
 		return extract_again(text)
 
 
 def extract_again(text):
-	pattern = r".*[aA]nswer:\s*\(?([A-J])\)?"
-	match = re.search(pattern, text)
+	match = re.search(r'.*[aA]nswer:\s*([A-J])', text)
 	if match:
-		return match.group(1)
+		return match[1]
 	else:
 		return extract_final(text)
 
