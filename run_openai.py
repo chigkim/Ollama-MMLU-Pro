@@ -343,7 +343,6 @@ def evaluate(subjects):
     system_prompt = config["inference"]["system_prompt"]
     for subject in subjects:
         start = time.time()
-        print(f"Testing {subject}...")
         config["inference"]["system_prompt"] = system_prompt.replace(
             "{subject}", subject
         )
@@ -357,9 +356,14 @@ def evaluate(subjects):
                 executor.submit(run_single_question, each, dev_df, res): each
                 for each in test_data
             }
-            for future in tqdm(
-                as_completed(futures), total=len(futures), smoothing=0.0, ascii=True
-            ):
+            bar = tqdm(
+                as_completed(futures),
+                total=len(futures),
+                smoothing=0.0,
+                ascii=True,
+                desc=subject,
+            )
+            for future in bar:
                 each = futures[future]
                 label = each["answer"]
                 category = subject
@@ -393,6 +397,13 @@ def evaluate(subjects):
                         category_record[category]["wrong"] += 1
                     save_res(res, output_res_path, lock)
                     save_summary(category_record, output_summary_path, lock)
+                    total = category_record["total"]
+                    stat = {
+                        "Correct": f"{int(total['corr'])}",
+                        "Wrong": f"{int(total['wrong'])}",
+                        "Accuracy": f"{total['acc']*100:.2f}",
+                    }
+                    bar.set_postfix(stat)
                     res, category_record = update_result(output_res_path, lock)
         save_res(res, output_res_path, lock)
         log(f"Finished testing {subject} in {elapsed(start)}.")
