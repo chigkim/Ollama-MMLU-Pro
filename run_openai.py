@@ -362,6 +362,7 @@ def evaluate(subjects):
                 smoothing=0.0,
                 ascii=True,
                 desc=subject,
+                dynamic_ncols=True,
             )
             for future in bar:
                 each = futures[future]
